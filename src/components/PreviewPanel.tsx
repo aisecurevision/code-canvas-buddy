@@ -3,7 +3,7 @@ import React from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sandpack, SandpackLogLevel } from '@codesandbox/sandpack-react';
+import { Sandpack } from '@codesandbox/sandpack-react';
 
 export const PreviewPanel = () => {
   const { files } = useProject();
@@ -164,7 +164,7 @@ body {
                   autoReload: true,
                   bundlerURL: undefined,
                   startRoute: "/",
-                  logLevel: SandpackLogLevel.Error,
+                  logLevel: "error",
                   classes: {
                     "sp-layout": "sandpack-layout",
                     "sp-preview-container": "sandpack-preview",
