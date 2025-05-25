@@ -22,38 +22,32 @@ class LLMService {
               role: 'system',
               content: `You are an expert React developer. Generate a complete, working React component with Tailwind CSS styling based on user requirements. 
 
-IMPORTANT REQUIREMENTS:
+CRITICAL REQUIREMENTS:
 - Generate ONLY the React component code for App.tsx
 - Use React hooks (useState, useEffect) for interactivity
-- Use Tailwind CSS for ALL styling (no custom CSS)
+- Use Tailwind CSS for ALL styling (no custom CSS classes)
 - Make it fully functional with working buttons, forms, etc.
 - Include proper TypeScript types
 - The component should be responsive and modern
 - Don't include any imports for external libraries except React hooks
 - Make it a complete, working application, not just a basic layout
+- Ensure all interactive elements actually work
+- Use proper event handlers and state management
 
-Example structure:
-\`\`\`tsx
-import React, { useState } from 'react';
+CODE STRUCTURE:
+- Start with: import React, { useState } from 'react';
+- End with: export default App;
+- Component name must be "App"
+- Use functional components only
+- Include real functionality, not just placeholder text
 
-const App = () => {
-  const [state, setState] = useState('');
-  
-  const handleAction = () => {
-    // Working functionality here
-  };
-  
-  return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      {/* Complete functional UI here */}
-    </div>
-  );
-};
+STYLING GUIDELINES:
+- Use Tailwind's utility classes extensively
+- Make it visually appealing with proper spacing, colors, and typography
+- Ensure responsive design with proper breakpoints
+- Use hover states and transitions for interactivity
 
-export default App;
-\`\`\`
-
-Return only the React component code, no explanations.`
+Return ONLY the component code without any explanations, markdown formatting, or code blocks.`
             },
             {
               role: 'user',
@@ -61,7 +55,7 @@ Return only the React component code, no explanations.`
             }
           ],
           temperature: 0.7,
-          max_tokens: 3000,
+          max_tokens: 4000,
         }),
       });
 
@@ -72,13 +66,26 @@ Return only the React component code, no explanations.`
       const data = await response.json();
       const content = data.choices[0].message.content;
       
-      // Extract React code from the response
-      const codeMatch = content.match(/```(?:tsx?|jsx?)\n([\s\S]*?)\n```/);
-      const extractedCode = codeMatch ? codeMatch[1] : content;
+      // Clean and extract React code from the response
+      let extractedCode = content;
+      
+      // Remove markdown code blocks if present
+      const codeMatch = content.match(/```(?:tsx?|jsx?)\n?([\s\S]*?)\n?```/);
+      if (codeMatch) {
+        extractedCode = codeMatch[1];
+      }
+      
+      // Remove any leading/trailing whitespace and ensure proper formatting
+      extractedCode = extractedCode.trim();
+      
+      // Validate that it's a proper React component
+      if (!extractedCode.includes('export default') || !extractedCode.includes('const App')) {
+        console.warn('Generated code might not be a valid React component');
+      }
       
       return {
         explanation: "Generated a complete React application based on your requirements.",
-        code: extractedCode.trim(),
+        code: extractedCode,
         files: []
       };
     } catch (error) {

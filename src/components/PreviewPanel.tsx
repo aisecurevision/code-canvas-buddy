@@ -22,18 +22,60 @@ export const PreviewPanel = () => {
     }
   };
 
-  // Convert files to Sandpack format
+  // Convert files to Sandpack format with proper structure
   const sandpackFiles = React.useMemo(() => {
     if (!hasFiles) return {};
     
     const filesMap: Record<string, string> = {};
     
+    // Find the main App component
+    const appFile = files.find(file => file.path === 'App.tsx');
+    const mainFile = files.find(file => file.path === 'main.tsx');
+    const indexHtml = files.find(file => file.path === 'index.html');
+    const indexCss = files.find(file => file.path === 'index.css');
+    
+    // Create proper file structure for Sandpack
+    if (appFile) {
+      filesMap['/App.tsx'] = appFile.content;
+    }
+    
+    // Create main.tsx if it exists, otherwise create a default one
+    if (mainFile) {
+      filesMap['/index.tsx'] = mainFile.content;
+    } else {
+      filesMap['/index.tsx'] = `import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+const container = document.getElementById('root');
+const root = createRoot(container!);
+root.render(<App />);`;
+    }
+    
+    // Add CSS file
+    if (indexCss) {
+      filesMap['/index.css'] = indexCss.content;
+    } else {
+      filesMap['/index.css'] = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}`;
+    }
+    
+    // Add any other component files
     files.forEach(file => {
-      if (file.path === 'index.html') {
-        filesMap['/public/index.html'] = file.content;
-      } else if (file.path === 'package.json') {
-        // Skip package.json as Sandpack handles dependencies
-      } else {
+      if (file.path !== 'App.tsx' && file.path !== 'main.tsx' && file.path !== 'index.html' && file.path !== 'index.css' && file.path !== 'package.json') {
         filesMap[`/${file.path}`] = file.content;
       }
     });
@@ -88,6 +130,7 @@ export const PreviewPanel = () => {
             variant="ghost"
             size="sm"
             className="text-slate-400 hover:text-white"
+            onClick={() => window.location.reload()}
           >
             <RefreshCw className="w-4 h-4" />
           </Button>
@@ -105,8 +148,8 @@ export const PreviewPanel = () => {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center">
-            <div className={`${getViewportClass()} max-w-full max-h-full`}>
+          <div className="flex items-start justify-center h-full">
+            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden bg-white`}>
               <Sandpack
                 files={sandpackFiles}
                 template="react-ts"
@@ -118,12 +161,23 @@ export const PreviewPanel = () => {
                   editorHeight: 0,
                   layout: "preview",
                   autorun: true,
+                  autoReload: true,
+                  bundlerURL: undefined,
+                  startRoute: "/",
+                  logLevel: "error",
+                  classes: {
+                    "sp-layout": "sandpack-layout",
+                    "sp-preview-container": "sandpack-preview",
+                  }
                 }}
                 customSetup={{
                   dependencies: {
                     "react": "^18.2.0",
                     "react-dom": "^18.2.0",
-                  }
+                    "@types/react": "^18.2.0",
+                    "@types/react-dom": "^18.2.0"
+                  },
+                  entry: "/index.tsx"
                 }}
               />
             </div>
