@@ -20,18 +20,40 @@ class LLMService {
           messages: [
             {
               role: 'system',
-              content: `You are an expert web developer. Generate clean, modern React code with Tailwind CSS styling based on user requirements. Always provide:
-1. A brief explanation of what you're building
-2. Clean, production-ready React component code
-3. Responsive design using Tailwind CSS
-4. Modern best practices
+              content: `You are an expert React developer. Generate a complete, working React component with Tailwind CSS styling based on user requirements. 
 
-Format your response as a JSON object with:
-{
-  "explanation": "Brief explanation of the app",
-  "code": "React component code",
-  "files": []
-}`
+IMPORTANT REQUIREMENTS:
+- Generate ONLY the React component code for App.tsx
+- Use React hooks (useState, useEffect) for interactivity
+- Use Tailwind CSS for ALL styling (no custom CSS)
+- Make it fully functional with working buttons, forms, etc.
+- Include proper TypeScript types
+- The component should be responsive and modern
+- Don't include any imports for external libraries except React hooks
+- Make it a complete, working application, not just a basic layout
+
+Example structure:
+\`\`\`tsx
+import React, { useState } from 'react';
+
+const App = () => {
+  const [state, setState] = useState('');
+  
+  const handleAction = () => {
+    // Working functionality here
+  };
+  
+  return (
+    <div className="min-h-screen bg-gray-100 p-4">
+      {/* Complete functional UI here */}
+    </div>
+  );
+};
+
+export default App;
+\`\`\`
+
+Return only the React component code, no explanations.`
             },
             {
               role: 'user',
@@ -39,7 +61,7 @@ Format your response as a JSON object with:
             }
           ],
           temperature: 0.7,
-          max_tokens: 2000,
+          max_tokens: 3000,
         }),
       });
 
@@ -50,39 +72,15 @@ Format your response as a JSON object with:
       const data = await response.json();
       const content = data.choices[0].message.content;
       
-      try {
-        const parsed = JSON.parse(content);
-        return parsed;
-      } catch {
-        // Fallback if the response isn't properly formatted JSON
-        return {
-          explanation: "I've generated a basic React component based on your request.",
-          code: `
-import React from 'react';
-
-const App = () => {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-8">
-      <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-        <h1 className="text-3xl font-bold text-gray-800 mb-4">
-          Generated App
-        </h1>
-        <p className="text-gray-600 mb-6">
-          ${prompt}
-        </p>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors">
-          Get Started
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default App;
-          `.trim(),
-          files: []
-        };
-      }
+      // Extract React code from the response
+      const codeMatch = content.match(/```(?:tsx?|jsx?)\n([\s\S]*?)\n```/);
+      const extractedCode = codeMatch ? codeMatch[1] : content;
+      
+      return {
+        explanation: "Generated a complete React application based on your requirements.",
+        code: extractedCode.trim(),
+        files: []
+      };
     } catch (error) {
       console.error('LLM Service Error:', error);
       throw new Error('Failed to connect to LM Studio API. Please ensure it\'s running on http://127.0.0.1:1234');

@@ -3,6 +3,7 @@ import React from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sandpack } from '@codesandbox/sandpack-react';
 
 export const PreviewPanel = () => {
   const { files } = useProject();
@@ -13,13 +14,32 @@ export const PreviewPanel = () => {
   const getViewportClass = () => {
     switch (viewMode) {
       case 'tablet':
-        return 'w-[768px] h-[1024px]';
+        return 'w-[768px] h-[600px]';
       case 'mobile':
         return 'w-[375px] h-[667px]';
       default:
-        return 'w-full h-full';
+        return 'w-full h-[600px]';
     }
   };
+
+  // Convert files to Sandpack format
+  const sandpackFiles = React.useMemo(() => {
+    if (!hasFiles) return {};
+    
+    const filesMap: Record<string, string> = {};
+    
+    files.forEach(file => {
+      if (file.path === 'index.html') {
+        filesMap['/public/index.html'] = file.content;
+      } else if (file.path === 'package.json') {
+        // Skip package.json as Sandpack handles dependencies
+      } else {
+        filesMap[`/${file.path}`] = file.content;
+      }
+    });
+    
+    return filesMap;
+  }, [files, hasFiles]);
 
   return (
     <div className="flex flex-col h-full">
@@ -75,7 +95,7 @@ export const PreviewPanel = () => {
       </div>
       
       {/* Preview Content */}
-      <div className="flex-1 bg-slate-900 overflow-auto">
+      <div className="flex-1 bg-slate-900 overflow-auto p-4">
         {!hasFiles ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center text-slate-500">
@@ -85,17 +105,27 @@ export const PreviewPanel = () => {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center p-8">
-            <div className={`bg-white rounded-lg shadow-2xl ${getViewportClass()} max-w-full max-h-full`}>
-              <div className="w-full h-full rounded-lg border border-slate-300 bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-                <div className="text-center text-slate-600">
-                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full mx-auto mb-4 flex items-center justify-center">
-                    <span className="text-white text-2xl font-bold">🚀</span>
-                  </div>
-                  <p className="text-lg font-semibold mb-2">Generated Application</p>
-                  <p className="text-sm opacity-70">Your AI-generated app will appear here</p>
-                </div>
-              </div>
+          <div className="flex items-center justify-center">
+            <div className={`${getViewportClass()} max-w-full max-h-full`}>
+              <Sandpack
+                files={sandpackFiles}
+                template="react-ts"
+                theme="dark"
+                options={{
+                  showNavigator: false,
+                  showTabs: false,
+                  showLineNumbers: false,
+                  editorHeight: 0,
+                  layout: "preview",
+                  autorun: true,
+                }}
+                customSetup={{
+                  dependencies: {
+                    "react": "^18.2.0",
+                    "react-dom": "^18.2.0",
+                  }
+                }}
+              />
             </div>
           </div>
         )}
