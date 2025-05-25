@@ -164,7 +164,6 @@ body {
                   autoReload: true,
                   bundlerURL: undefined,
                   startRoute: "/",
-                  logLevel: "error",
                   classes: {
                     "sp-layout": "sandpack-layout",
                     "sp-preview-container": "sandpack-preview",
