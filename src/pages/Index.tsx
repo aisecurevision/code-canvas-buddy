@@ -3,13 +3,12 @@ import React, { useState } from 'react';
 import { ChatInterface } from '@/components/ChatInterface';
 import { CodeEditor } from '@/components/CodeEditor';
 import { PreviewPanel } from '@/components/PreviewPanel';
-import { LivePreview } from '@/components/LivePreview';
 import { FileExplorer } from '@/components/FileExplorer';
 import { Header } from '@/components/Header';
 import { ProjectProvider } from '@/contexts/ProjectContext';
 
 const Index = () => {
-  const [activePanel, setActivePanel] = useState<'chat' | 'code' | 'preview' | 'live'>('chat');
+  const [activePanel, setActivePanel] = useState<'chat' | 'code' | 'preview'>('chat');
 
   return (
     <ProjectProvider>
@@ -71,16 +70,6 @@ const Index = () => {
                     : 'text-slate-400 hover:text-white hover:bg-slate-700/30'
                 }`}
               >
-                Sandpack Preview
-              </button>
-              <button
-                onClick={() => setActivePanel('live')}
-                className={`py-3 px-6 text-sm font-medium transition-colors ${
-                  activePanel === 'live'
-                    ? 'bg-orange-600/20 text-orange-400 border-b-2 border-orange-400'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700/30'
-                }`}
-              >
                 Live Preview
               </button>
             </div>
@@ -88,7 +77,6 @@ const Index = () => {
             <div className="flex-1 bg-slate-900/50">
               {activePanel === 'code' && <CodeEditor />}
               {activePanel === 'preview' && <PreviewPanel />}
-              {activePanel === 'live' && <LivePreview />}
             </div>
           </div>
         </div>

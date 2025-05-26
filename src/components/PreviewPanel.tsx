@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { useProject } from '@/contexts/ProjectContext';
-import { Monitor, Smartphone, Tablet, RefreshCw, AlertCircle } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sandpack } from '@codesandbox/sandpack-react';
 
@@ -23,36 +23,37 @@ export const PreviewPanel = () => {
     }
   };
 
-  // Convert project files to Sandpack format
-  const getSandpackFiles = React.useMemo(() => {
+  // Convert our files to Sandpack format
+  const sandpackFiles = React.useMemo(() => {
     if (!hasFiles) return {};
     
-    const sandpackFiles: Record<string, string> = {};
+    const convertedFiles: Record<string, string> = {};
     
     files.forEach(file => {
-      // Map file paths to Sandpack structure
+      // Map our file paths to Sandpack expected paths
       let sandpackPath = file.path;
       
-      // Convert to src/ structure for better organization
       if (file.path === 'App.tsx') {
         sandpackPath = '/App.tsx';
       } else if (file.path === 'main.tsx') {
         sandpackPath = '/index.tsx';
       } else if (file.path === 'index.css') {
-        sandpackPath = '/styles.css';
+        sandpackPath = '/index.css';
+      } else if (file.path === 'package.json') {
+        sandpackPath = '/package.json';
       } else {
         sandpackPath = `/${file.path}`;
       }
       
-      sandpackFiles[sandpackPath] = file.content;
+      convertedFiles[sandpackPath] = file.content;
     });
-    
-    // Ensure we have the required entry point
-    if (!sandpackFiles['/index.tsx'] && sandpackFiles['/App.tsx']) {
-      sandpackFiles['/index.tsx'] = `import React from 'react';
+
+    // Ensure we have the required index.tsx entry point
+    if (!convertedFiles['/index.tsx']) {
+      convertedFiles['/index.tsx'] = `import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import './styles.css';
+import './index.css';
 
 const container = document.getElementById('root');
 if (container) {
@@ -60,9 +61,27 @@ if (container) {
   root.render(<App />);
 }`;
     }
-    
-    return sandpackFiles;
-  }, [files, hasFiles]);
+
+    // Ensure we have basic CSS if none provided
+    if (!convertedFiles['/index.css']) {
+      convertedFiles['/index.css'] = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}`;
+    }
+
+    return convertedFiles;
+  }, [files, hasFiles, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -134,27 +153,30 @@ if (container) {
           </div>
         ) : (
           <div className="flex items-start justify-center h-full">
-            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden bg-white`}>
+            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden`}>
               <Sandpack
                 key={refreshKey}
                 template="react-ts"
-                files={getSandpackFiles}
+                files={sandpackFiles}
                 theme="dark"
                 options={{
+                  showConsole: false,
+                  showConsoleButton: false,
+                  showRefreshButton: false,
+                  showOpenInCodeSandbox: false,
                   showNavigator: false,
-                  showTabs: false,
-                  showLineNumbers: false,
-                  showInlineErrors: true,
-                  wrapContent: true,
                   editorHeight: 0,
-                  layout: "preview"
+                  editorWidthPercentage: 0,
+                  wrapContent: true,
+                  autorun: true,
+                  autoReload: true,
+                  bundlerURL: "https://sandpack-bundler.codesandbox.io",
                 }}
                 customSetup={{
                   dependencies: {
-                    'react': '^18.2.0',
-                    'react-dom': '^18.2.0',
-                    '@types/react': '^18.2.0',
-                    '@types/react-dom': '^18.2.0'
+                    "react": "^18.2.0",
+                    "react-dom": "^18.2.0",
+                    "tailwindcss": "^3.3.0"
                   }
                 }}
               />
