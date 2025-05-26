@@ -15,6 +15,8 @@ interface ProjectContextType {
   isGenerating: boolean;
   projectName: string;
   setProjectName: (name: string) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -36,46 +38,41 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [projectName, setProjectName] = useState('Generated App');
+  const [error, setError] = useState<string | null>(null);
 
   const generateProject = async (response: any) => {
     setIsGenerating(true);
+    setError(null);
     
     try {
       // Parse the LLM response to extract components and create file structure
       const appCode = response.code || response.generatedText || '';
       
       // Clean up the code to ensure it's valid React/TypeScript
-      const cleanedCode = appCode
-        .replace(/```(?:tsx?|jsx?)\n?/g, '')
+      let cleanedCode = appCode
+        .replace(/```(?:tsx?|jsx?|typescript)\n?/g, '')
         .replace(/```\n?/g, '')
         .trim();
-      
+
+      // Validate that we have valid React code
+      if (!cleanedCode || cleanedCode.length < 10) {
+        throw new Error('Generated code is empty or too short');
+      }
+
+      // Ensure the component has proper React imports and exports
+      if (!cleanedCode.includes('import React') && !cleanedCode.includes('from \'react\'')) {
+        cleanedCode = `import React, { useState } from 'react';\n\n${cleanedCode}`;
+      }
+
+      if (!cleanedCode.includes('export default')) {
+        cleanedCode += '\n\nexport default App;';
+      }
+
       // Create a complete project structure with proper imports
       const newFiles: ProjectFile[] = [
         {
           path: 'App.tsx',
-          content: cleanedCode || `import React, { useState } from 'react';
-
-const App = () => {
-  const [message, setMessage] = useState('Hello from Generated App!');
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">Welcome!</h1>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <button 
-          onClick={() => setMessage('App is working perfectly!')}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors"
-        >
-          Test Interaction
-        </button>
-      </div>
-    </div>
-  );
-};
-
-export default App;`,
+          content: cleanedCode,
           type: 'component'
         },
         {
@@ -91,22 +88,6 @@ if (container) {
   root.render(<App />);
 }`,
           type: 'component'
-        },
-        {
-          path: 'index.html',
-          content: `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${projectName}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body>
-    <div id="root"></div>
-  </body>
-</html>`,
-          type: 'other'
         },
         {
           path: 'index.css',
@@ -165,9 +146,11 @@ body {
       setSelectedFile(newFiles[0]);
       
       console.log('Project generated successfully with files:', newFiles.map(f => f.path));
+      console.log('App.tsx content:', newFiles[0].content);
       
     } catch (error) {
       console.error('Error generating project:', error);
+      setError(error instanceof Error ? error.message : 'Failed to generate project');
     } finally {
       setIsGenerating(false);
     }
@@ -183,6 +166,8 @@ body {
         isGenerating,
         projectName,
         setProjectName,
+        error,
+        setError,
       }}
     >
       {children}

@@ -3,11 +3,12 @@ import React from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sandpack } from '@codesandbox/sandpack-react';
 
 export const PreviewPanel = () => {
   const { files } = useProject();
   const [viewMode, setViewMode] = React.useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [previewKey, setPreviewKey] = React.useState(0);
+  const [refreshKey, setRefreshKey] = React.useState(0);
   
   const hasFiles = files.length > 0;
 
@@ -22,67 +23,69 @@ export const PreviewPanel = () => {
     }
   };
 
-  // Create a blob URL for the preview
-  const createPreviewUrl = React.useMemo(() => {
-    if (!hasFiles) return null;
+  // Convert our files to Sandpack format
+  const sandpackFiles = React.useMemo(() => {
+    if (!hasFiles) return {};
     
-    const appFile = files.find(file => file.path === 'App.tsx');
-    const indexCss = files.find(file => file.path === 'index.css');
+    const convertedFiles: Record<string, string> = {};
     
-    if (!appFile) return null;
+    files.forEach(file => {
+      // Map our file paths to Sandpack expected paths
+      let sandpackPath = file.path;
+      
+      if (file.path === 'App.tsx') {
+        sandpackPath = '/App.tsx';
+      } else if (file.path === 'main.tsx') {
+        sandpackPath = '/index.tsx';
+      } else if (file.path === 'index.css') {
+        sandpackPath = '/index.css';
+      } else if (file.path === 'package.json') {
+        sandpackPath = '/package.json';
+      } else {
+        sandpackPath = `/${file.path}`;
+      }
+      
+      convertedFiles[sandpackPath] = file.content;
+    });
 
-    // Create a complete HTML document with React
-    const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preview</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        ${indexCss?.content || `
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.5; }
-          #root { min-height: 100vh; }
-        `}
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState, useEffect, useRef, useCallback, useMemo } = React;
-        
-        // Transform the App component code
-        ${appFile.content.replace('export default App;', '')}
-        
-        // Render the app
-        const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(React.createElement(App));
-    </script>
-</body>
-</html>`;
+    // Ensure we have the required index.tsx entry point
+    if (!convertedFiles['/index.tsx']) {
+      convertedFiles['/index.tsx'] = `import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './index.css';
 
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    return URL.createObjectURL(blob);
-  }, [files, hasFiles, previewKey]);
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(<App />);
+}`;
+    }
+
+    // Ensure we have basic CSS if none provided
+    if (!convertedFiles['/index.css']) {
+      convertedFiles['/index.css'] = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.5;
+}`;
+    }
+
+    return convertedFiles;
+  }, [files, hasFiles, refreshKey]);
 
   const handleRefresh = () => {
-    setPreviewKey(prev => prev + 1);
+    setRefreshKey(prev => prev + 1);
   };
-
-  // Clean up blob URL when component unmounts
-  React.useEffect(() => {
-    return () => {
-      if (createPreviewUrl) {
-        URL.revokeObjectURL(createPreviewUrl);
-      }
-    };
-  }, [createPreviewUrl]);
 
   return (
     <div className="flex flex-col h-full">
@@ -148,25 +151,35 @@ export const PreviewPanel = () => {
               <p className="text-sm">Generate code through the chat to see a live preview</p>
             </div>
           </div>
-        ) : createPreviewUrl ? (
-          <div className="flex items-start justify-center h-full">
-            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden bg-white`}>
-              <iframe
-                key={previewKey}
-                src={createPreviewUrl}
-                className="w-full h-full"
-                title="Preview"
-                sandbox="allow-scripts allow-same-origin"
-                style={{ border: 'none' }}
-              />
-            </div>
-          </div>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-slate-500">
-              <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30" />
-              <p className="text-lg font-medium mb-2">Preview Error</p>
-              <p className="text-sm">Unable to generate preview from current files</p>
+          <div className="flex items-start justify-center h-full">
+            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden`}>
+              <Sandpack
+                key={refreshKey}
+                template="react-ts"
+                files={sandpackFiles}
+                theme="dark"
+                options={{
+                  showConsole: false,
+                  showConsoleButton: false,
+                  showRefreshButton: false,
+                  showOpenInCodeSandbox: false,
+                  showNavigator: false,
+                  editorHeight: 0,
+                  editorWidthPercentage: 0,
+                  wrapContent: true,
+                  autorun: true,
+                  autoReload: true,
+                  bundlerURL: "https://sandpack-bundler.codesandbox.io",
+                }}
+                customSetup={{
+                  dependencies: {
+                    "react": "^18.2.0",
+                    "react-dom": "^18.2.0",
+                    "tailwindcss": "^3.3.0"
+                  }
+                }}
+              />
             </div>
           </div>
         )}

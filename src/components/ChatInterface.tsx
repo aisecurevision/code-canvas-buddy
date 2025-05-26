@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send, Paperclip, Sparkles, Download } from 'lucide-react';
+import { Send, Paperclip, Sparkles, Download, AlertCircle } from 'lucide-react';
 import { useProject } from '@/contexts/ProjectContext';
 import { llmService } from '@/services/llmService';
 
@@ -26,7 +26,7 @@ export const ChatInterface = () => {
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { generateProject, files, projectName, setProjectName } = useProject();
+  const { generateProject, files, projectName, setProjectName, error, setError } = useProject();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,6 +35,19 @@ export const ChatInterface = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    if (error) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: `❌ Error generating preview: ${error}\n\nPlease try again with a simpler request, or check that your code follows React best practices.`,
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      setError(null);
+    }
+  }, [error, setError]);
 
   const handleExport = () => {
     if (files.length === 0) return;
@@ -79,6 +92,11 @@ export const ChatInterface = () => {
     try {
       const response = await llmService.generateCode(currentInput);
       
+      // Validate the response
+      if (!response.code || response.code.trim().length === 0) {
+        throw new Error('LLM returned empty code');
+      }
+
       setMessages(prev => prev.map(msg => 
         msg.id === aiMessage.id 
           ? { ...msg, content: `✅ Generated a complete React application!\n\n**Features created:**\n${response.explanation}\n\nCheck the **Live Preview** tab to see your app in action, or visit the **Code** tab to explore the generated files.`, isGenerating: false }
@@ -95,11 +113,12 @@ export const ChatInterface = () => {
       setProjectName(appName);
       
     } catch (error) {
+      console.error('Chat error:', error);
       setMessages(prev => prev.map(msg => 
         msg.id === aiMessage.id 
           ? { 
               ...msg, 
-              content: "❌ I couldn't connect to the LM Studio API. Please make sure:\n\n1. LM Studio is running\n2. A model is loaded\n3. The server is started on http://127.0.0.1:1234\n\nThen try your request again.", 
+              content: `❌ I couldn't generate your app. Error: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease make sure:\n\n1. LM Studio is running\n2. A model is loaded\n3. The server is started on http://127.0.0.1:1234\n\nThen try your request again.`, 
               isGenerating: false 
             }
           : msg
@@ -128,6 +147,16 @@ export const ChatInterface = () => {
             <Download className="w-4 h-4 mr-2" />
             Export Project Files
           </Button>
+        </div>
+      )}
+
+      {/* Error Display */}
+      {error && (
+        <div className="p-4 border-b border-slate-700/50">
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 flex items-start space-x-2">
+            <AlertCircle className="w-5 h-5 text-red-400 mt-0.5" />
+            <div className="text-red-300 text-sm">{error}</div>
+          </div>
         </div>
       )}
 
