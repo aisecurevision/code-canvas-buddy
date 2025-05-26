@@ -3,12 +3,12 @@ import React from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Sandpack } from '@codesandbox/sandpack-react';
 
 export const PreviewPanel = () => {
   const { files } = useProject();
   const [viewMode, setViewMode] = React.useState<'desktop' | 'tablet' | 'mobile'>('desktop');
   const [refreshKey, setRefreshKey] = React.useState(0);
-  const [previewError, setPreviewError] = React.useState<string | null>(null);
   
   const hasFiles = files.length > 0;
 
@@ -23,128 +23,49 @@ export const PreviewPanel = () => {
     }
   };
 
-  // Generate HTML document for preview
-  const generatePreviewHTML = React.useMemo(() => {
-    if (!hasFiles) return null;
+  // Convert project files to Sandpack format
+  const getSandpackFiles = React.useMemo(() => {
+    if (!hasFiles) return {};
     
-    try {
-      setPreviewError(null);
+    const sandpackFiles: Record<string, string> = {};
+    
+    files.forEach(file => {
+      // Map file paths to Sandpack structure
+      let sandpackPath = file.path;
       
-      // Find the main App component
-      const appFile = files.find(file => file.path === 'App.tsx');
-      if (!appFile) {
-        setPreviewError('No App.tsx file found');
-        return null;
+      // Convert to src/ structure for better organization
+      if (file.path === 'App.tsx') {
+        sandpackPath = '/App.tsx';
+      } else if (file.path === 'main.tsx') {
+        sandpackPath = '/index.tsx';
+      } else if (file.path === 'index.css') {
+        sandpackPath = '/styles.css';
+      } else {
+        sandpackPath = `/${file.path}`;
       }
-
-      // Extract CSS content
-      const cssFile = files.find(file => file.path === 'index.css');
-      const cssContent = cssFile?.content || '';
-
-      // Transform the React code to work in browser
-      let appCode = appFile.content;
       
-      // Remove TypeScript types and interfaces for browser compatibility
-      appCode = appCode
-        .replace(/: React\.FC\s*(<[^>]*>)?\s*=/g, ' =')
-        .replace(/: string/g, '')
-        .replace(/: number/g, '')
-        .replace(/: boolean/g, '')
-        .replace(/: React\.FormEvent<[^>]*>/g, '')
-        .replace(/: React\.ChangeEvent<[^>]*>/g, '')
-        .replace(/interface\s+\w+\s*{[^}]*}/g, '')
-        .replace(/type\s+\w+\s*=[^;]*;/g, '');
+      sandpackFiles[sandpackPath] = file.content;
+    });
+    
+    // Ensure we have the required entry point
+    if (!sandpackFiles['/index.tsx'] && sandpackFiles['/App.tsx']) {
+      sandpackFiles['/index.tsx'] = `import React from 'react';
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './styles.css';
 
-      // Create the complete HTML document
-      const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preview</title>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        ${cssContent}
-        body {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', sans-serif;
-        }
-        * {
-            box-sizing: border-box;
-        }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
-    <script type="text/babel">
-        const { useState, useEffect, Fragment } = React;
-        
-        ${appCode}
-        
-        // Render the app
-        const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        
-        try {
-            root.render(React.createElement(App));
-        } catch (error) {
-            console.error('Preview Error:', error);
-            root.render(
-                React.createElement('div', {
-                    style: {
-                        padding: '20px',
-                        backgroundColor: '#fee2e2',
-                        border: '1px solid #fecaca',
-                        borderRadius: '8px',
-                        margin: '20px',
-                        color: '#991b1b'
-                    }
-                }, 
-                React.createElement('h3', {}, 'Preview Error'),
-                React.createElement('p', {}, error.message || 'Failed to render component'),
-                React.createElement('pre', {
-                    style: { fontSize: '12px', marginTop: '10px', overflow: 'auto' }
-                }, error.stack || '')
-                )
-            );
-        }
-    </script>
-</body>
-</html>`;
-
-      return htmlContent;
-    } catch (error) {
-      console.error('Error generating preview:', error);
-      setPreviewError(error instanceof Error ? error.message : 'Unknown error generating preview');
-      return null;
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
+  root.render(<App />);
+}`;
     }
-  }, [files, hasFiles, refreshKey]);
-
-  const previewUrl = React.useMemo(() => {
-    if (!generatePreviewHTML) return null;
     
-    const blob = new Blob([generatePreviewHTML], { type: 'text/html' });
-    return URL.createObjectURL(blob);
-  }, [generatePreviewHTML]);
-
-  // Cleanup blob URL on unmount
-  React.useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+    return sandpackFiles;
+  }, [files, hasFiles]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
-    setPreviewError(null);
   };
 
   return (
@@ -211,43 +132,32 @@ export const PreviewPanel = () => {
               <p className="text-sm">Generate code through the chat to see a live preview</p>
             </div>
           </div>
-        ) : previewError ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-6 max-w-md">
-                <AlertCircle className="w-12 h-12 mx-auto mb-4 text-red-400" />
-                <h3 className="text-lg font-medium text-red-300 mb-2">Preview Error</h3>
-                <p className="text-sm text-red-200">{previewError}</p>
-                <Button
-                  onClick={handleRefresh}
-                  className="mt-4 bg-red-600 hover:bg-red-700"
-                  size="sm"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : previewUrl ? (
+        ) : (
           <div className="flex items-start justify-center h-full">
             <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden bg-white`}>
-              <iframe
+              <Sandpack
                 key={refreshKey}
-                src={previewUrl}
-                className="w-full h-full border-0"
-                sandbox="allow-scripts allow-same-origin"
-                title="App Preview"
-                onError={() => setPreviewError('Failed to load preview iframe')}
+                template="react-ts"
+                files={getSandpackFiles}
+                theme="dark"
+                options={{
+                  showNavigator: false,
+                  showTabs: false,
+                  showLineNumbers: false,
+                  showInlineErrors: true,
+                  wrapContent: true,
+                  editorHeight: 0,
+                  layout: "preview"
+                }}
+                customSetup={{
+                  dependencies: {
+                    'react': '^18.2.0',
+                    'react-dom': '^18.2.0',
+                    '@types/react': '^18.2.0',
+                    '@types/react-dom': '^18.2.0'
+                  }
+                }}
               />
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-slate-500">
-              <Monitor className="w-16 h-16 mx-auto mb-4 opacity-30 animate-pulse" />
-              <p className="text-lg font-medium mb-2">Generating Preview...</p>
-              <p className="text-sm">Please wait while we prepare your app</p>
             </div>
           </div>
         )}

@@ -68,7 +68,7 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
         cleanedCode += '\n\nexport default App;';
       }
 
-      // Create a complete project structure with proper imports
+      // Create a complete project structure optimized for Sandpack
       const newFiles: ProjectFile[] = [
         {
           path: 'App.tsx',
@@ -76,24 +76,8 @@ export const ProjectProvider: React.FC<ProjectProviderProps> = ({ children }) =>
           type: 'component'
         },
         {
-          path: 'main.tsx',
-          content: `import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './index.css';
-
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
-}`,
-          type: 'component'
-        },
-        {
           path: 'index.css',
-          content: `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+          content: `@import url('https://cdn.tailwindcss.com');
 
 * {
   margin: 0;
@@ -132,10 +116,7 @@ body {
               '@types/react-dom': '^18.2.0',
               '@vitejs/plugin-react': '^4.0.0',
               'typescript': '^5.0.0',
-              'vite': '^4.0.0',
-              'tailwindcss': '^3.3.0',
-              'autoprefixer': '^10.4.0',
-              'postcss': '^8.4.0'
+              'vite': '^4.0.0'
             }
           }, null, 2),
           type: 'config'
