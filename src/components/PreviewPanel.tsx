@@ -161,16 +161,13 @@ body {
                 theme="dark"
                 options={{
                   showConsole: false,
-                  showConsoleButton: false,
                   showRefreshButton: false,
-                  showOpenInCodeSandbox: false,
                   showNavigator: false,
                   editorHeight: 0,
                   editorWidthPercentage: 0,
                   wrapContent: true,
                   autorun: true,
                   autoReload: true,
-                  bundlerURL: "https://sandpack-bundler.codesandbox.io",
                 }}
                 customSetup={{
                   dependencies: {
