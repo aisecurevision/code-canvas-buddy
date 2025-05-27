@@ -44,6 +44,47 @@ export const PreviewPanel = () => {
     }
   }, []);
 
+  // Convert TypeScript/JSX code to pure JavaScript
+  const convertCodeToJS = (code: string): string => {
+    // Remove TypeScript type annotations and interfaces
+    let cleanCode = code
+      // Remove interface declarations
+      .replace(/interface\s+\w+\s*{[^}]*}/g, '')
+      // Remove type declarations
+      .replace(/type\s+\w+\s*=[^;]*;/g, '')
+      // Remove function parameter types
+      .replace(/:\s*React\.FC[^>]*>/g, '')
+      .replace(/:\s*string/g, '')
+      .replace(/:\s*number/g, '')
+      .replace(/:\s*boolean/g, '')
+      .replace(/:\s*any/g, '')
+      .replace(/:\s*void/g, '')
+      // Remove return type annotations
+      .replace(/\):\s*\w+\s*=>/g, ') =>')
+      .replace(/\):\s*\w+\s*{/g, ') {')
+      // Remove variable type annotations
+      .replace(/const\s+(\w+):\s*\w+\s*=/g, 'const $1 =')
+      .replace(/let\s+(\w+):\s*\w+\s*=/g, 'let $1 =')
+      // Remove import statements (they won't work in iframe)
+      .replace(/import.*from.*['"][^'"]*['"];?\n?/g, '')
+      // Remove export statements and convert to direct function
+      .replace(/export\s+default\s+/g, '')
+      .trim();
+
+    // Ensure React import exists for JSX
+    if (!cleanCode.includes('React') && cleanCode.includes('<')) {
+      cleanCode = `const { useState, useEffect } = React;\n\n${cleanCode}`;
+    }
+
+    // If it's a component function, wrap it for rendering
+    if (cleanCode.includes('function App') || cleanCode.includes('const App')) {
+      // Add rendering call at the end
+      cleanCode += `\n\n// Render the component\nReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));`;
+    }
+
+    return cleanCode;
+  };
+
   // Compile and render the React code
   useEffect(() => {
     if (!hasFiles || !window.Babel) return;
@@ -60,26 +101,19 @@ export const PreviewPanel = () => {
         return;
       }
 
-      // Clean the JSX code and remove TypeScript annotations
-      let jsxCode = appFile.content
-        .replace(/: React\.FC[^>]*>/g, '>')
-        .replace(/: string/g, '')
-        .replace(/: number/g, '')
-        .replace(/: boolean/g, '')
-        .replace(/: any/g, '')
-        .replace(/interface\s+\w+\s*{[^}]*}/g, '')
-        .replace(/type\s+\w+\s*=[^;]*;/g, '');
+      console.log('Original code:', appFile.content);
 
-      // Ensure React import exists
-      if (!jsxCode.includes('import React')) {
-        jsxCode = `import React, { useState } from 'react';\n\n${jsxCode}`;
-      }
+      // Clean the code and convert TypeScript to JavaScript
+      const cleanedCode = convertCodeToJS(appFile.content);
+      console.log('Cleaned code:', cleanedCode);
 
-      // Compile JSX to JavaScript using Babel
-      const compiledCode = window.Babel.transform(jsxCode, {
-        presets: ['react'],
+      // Compile JSX to JavaScript using Babel with TypeScript support
+      const compiledCode = window.Babel.transform(cleanedCode, {
+        presets: ['react', 'typescript'],
         plugins: []
       }).code;
+
+      console.log('Compiled code:', compiledCode);
 
       // Create the HTML template for the iframe
       const htmlTemplate = `
@@ -103,6 +137,10 @@ export const PreviewPanel = () => {
       padding: 20px;
       font-family: monospace;
       white-space: pre-wrap;
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      border-radius: 4px;
+      margin: 20px;
     }
   </style>
 </head>
@@ -110,15 +148,11 @@ export const PreviewPanel = () => {
   <div id="root"></div>
   <script>
     try {
-      ${compiledCode.replace(/import.*from.*['"][^'"]*['"];?/g, '')}
-      
-      // Render the App component
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
+      ${compiledCode}
     } catch (error) {
       console.error('Runtime error:', error);
       document.getElementById('root').innerHTML = 
-        '<div class="error">Runtime Error: ' + error.message + '</div>';
+        '<div class="error">Runtime Error: ' + error.message + '\\n\\n' + error.stack + '</div>';
     }
   </script>
 </body>

@@ -28,6 +28,7 @@ CRITICAL REQUIREMENTS:
 - Use Tailwind CSS for ALL styling (no custom CSS classes)
 - Make it fully functional with working buttons, forms, etc.
 - DO NOT include TypeScript types like : string, : number, : React.FC, etc.
+- DO NOT include interface or type declarations
 - The component should be responsive and modern
 - Don't include any imports for external libraries except React hooks
 - Make it a complete, working application, not just a basic layout
@@ -35,12 +36,14 @@ CRITICAL REQUIREMENTS:
 - Use proper event handlers and state management
 
 CODE STRUCTURE:
-- Start with: import React, { useState } from 'react';
+- Start with: function App() {
 - End with: export default App;
 - Component name must be "App"
 - Use functional components only
 - Include real functionality, not just placeholder text
 - NO TypeScript syntax whatsoever
+- NO interface declarations
+- NO type annotations on variables, parameters, or return types
 
 STYLING GUIDELINES:
 - Use Tailwind's utility classes extensively
@@ -79,18 +82,33 @@ Return ONLY the component code without any explanations, markdown formatting, or
       // Remove any leading/trailing whitespace and ensure proper formatting
       extractedCode = extractedCode.trim();
       
-      // Clean TypeScript annotations that might have slipped through
+      // Aggressively clean TypeScript annotations that might have slipped through
       extractedCode = extractedCode
-        .replace(/: React\.FC[^>]*>/g, '>')
-        .replace(/: string/g, '')
-        .replace(/: number/g, '')
-        .replace(/: boolean/g, '')
-        .replace(/: any/g, '')
-        .replace(/interface\s+\w+\s*{[^}]*}/g, '')
-        .replace(/type\s+\w+\s*=[^;]*;/g, '');
+        // Remove interface declarations
+        .replace(/interface\s+\w+\s*{[^}]*}/gs, '')
+        // Remove type declarations
+        .replace(/type\s+\w+\s*=[^;]*;/g, '')
+        // Remove React.FC and similar types
+        .replace(/:\s*React\.FC[^>]*>/g, '')
+        // Remove parameter type annotations
+        .replace(/:\s*string(?=[\s,\)])/g, '')
+        .replace(/:\s*number(?=[\s,\)])/g, '')
+        .replace(/:\s*boolean(?=[\s,\)])/g, '')
+        .replace(/:\s*any(?=[\s,\)])/g, '')
+        .replace(/:\s*void(?=[\s,\)])/g, '')
+        // Remove return type annotations
+        .replace(/\):\s*\w+(\[\])?\s*=>/g, ') =>')
+        .replace(/\):\s*\w+(\[\])?\s*{/g, ') {')
+        // Remove variable type annotations
+        .replace(/const\s+(\w+):\s*\w+(\[\])?\s*=/g, 'const $1 =')
+        .replace(/let\s+(\w+):\s*\w+(\[\])?\s*=/g, 'let $1 =')
+        // Remove useState type annotations
+        .replace(/useState<[^>]*>/g, 'useState')
+        // Remove useEffect type annotations
+        .replace(/useEffect<[^>]*>/g, 'useEffect');
       
       // Validate that it's a proper React component
-      if (!extractedCode.includes('export default') || !extractedCode.includes('const App')) {
+      if (!extractedCode.includes('function App') && !extractedCode.includes('const App')) {
         console.warn('Generated code might not be a valid React component');
       }
       
