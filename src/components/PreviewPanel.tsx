@@ -1,14 +1,23 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useProject } from '@/contexts/ProjectContext';
-import { Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react';
+import { Monitor, Smartphone, Tablet, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Sandpack } from '@codesandbox/sandpack-react';
+
+// Import Babel for in-browser compilation
+declare global {
+  interface Window {
+    Babel: any;
+  }
+}
 
 export const PreviewPanel = () => {
   const { files } = useProject();
-  const [viewMode, setViewMode] = React.useState<'desktop' | 'tablet' | 'mobile'>('desktop');
-  const [refreshKey, setRefreshKey] = React.useState(0);
+  const [viewMode, setViewMode] = useState<'desktop' | 'tablet' | 'mobile'>('desktop');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [compilationError, setCompilationError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   
   const hasFiles = files.length > 0;
 
@@ -23,64 +32,115 @@ export const PreviewPanel = () => {
     }
   };
 
-  // Convert our files to Sandpack format
-  const sandpackFiles = React.useMemo(() => {
-    if (!hasFiles) return {};
-    
-    const convertedFiles: Record<string, string> = {};
-    
-    files.forEach(file => {
-      // Map our file paths to Sandpack expected paths
-      let sandpackPath = file.path;
-      
-      if (file.path === 'App.tsx') {
-        sandpackPath = '/App.tsx';
-      } else if (file.path === 'main.tsx') {
-        sandpackPath = '/index.tsx';
-      } else if (file.path === 'index.css') {
-        sandpackPath = '/index.css';
-      } else if (file.path === 'package.json') {
-        sandpackPath = '/package.json';
-      } else {
-        sandpackPath = `/${file.path}`;
+  // Load Babel if not already loaded
+  useEffect(() => {
+    if (!window.Babel) {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@babel/standalone/babel.min.js';
+      script.onload = () => {
+        console.log('Babel loaded successfully');
+      };
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Compile and render the React code
+  useEffect(() => {
+    if (!hasFiles || !window.Babel) return;
+
+    setIsLoading(true);
+    setCompilationError(null);
+
+    try {
+      // Find the main App component
+      const appFile = files.find(file => file.path === 'App.tsx');
+      if (!appFile) {
+        setCompilationError('No App.tsx file found');
+        setIsLoading(false);
+        return;
       }
+
+      // Clean the JSX code and remove TypeScript annotations
+      let jsxCode = appFile.content
+        .replace(/: React\.FC[^>]*>/g, '>')
+        .replace(/: string/g, '')
+        .replace(/: number/g, '')
+        .replace(/: boolean/g, '')
+        .replace(/: any/g, '')
+        .replace(/interface\s+\w+\s*{[^}]*}/g, '')
+        .replace(/type\s+\w+\s*=[^;]*;/g, '');
+
+      // Ensure React import exists
+      if (!jsxCode.includes('import React')) {
+        jsxCode = `import React, { useState } from 'react';\n\n${jsxCode}`;
+      }
+
+      // Compile JSX to JavaScript using Babel
+      const compiledCode = window.Babel.transform(jsxCode, {
+        presets: ['react'],
+        plugins: []
+      }).code;
+
+      // Create the HTML template for the iframe
+      const htmlTemplate = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Preview</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: white;
+    }
+    .error {
+      color: red;
+      padding: 20px;
+      font-family: monospace;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    try {
+      ${compiledCode.replace(/import.*from.*['"][^'"]*['"];?/g, '')}
       
-      convertedFiles[sandpackPath] = file.content;
-    });
-
-    // Ensure we have the required index.tsx entry point
-    if (!convertedFiles['/index.tsx']) {
-      convertedFiles['/index.tsx'] = `import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import './index.css';
-
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
-}`;
+      // Render the App component
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement(App));
+    } catch (error) {
+      console.error('Runtime error:', error);
+      document.getElementById('root').innerHTML = 
+        '<div class="error">Runtime Error: ' + error.message + '</div>';
     }
+  </script>
+</body>
+</html>`;
 
-    // Ensure we have basic CSS if none provided
-    if (!convertedFiles['/index.css']) {
-      convertedFiles['/index.css'] = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
+      // Update iframe content
+      if (iframeRef.current) {
+        const iframeDoc = iframeRef.current.contentDocument;
+        if (iframeDoc) {
+          iframeDoc.open();
+          iframeDoc.write(htmlTemplate);
+          iframeDoc.close();
+        }
+      }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  line-height: 1.5;
-}`;
+      console.log('Code compiled and rendered successfully');
+    } catch (error) {
+      console.error('Compilation error:', error);
+      setCompilationError(error instanceof Error ? error.message : 'Unknown compilation error');
+    } finally {
+      setIsLoading(false);
     }
-
-    return convertedFiles;
   }, [files, hasFiles, refreshKey]);
 
   const handleRefresh = () => {
@@ -94,6 +154,9 @@ body {
         <div className="flex items-center space-x-2">
           <Monitor className="w-5 h-5 text-green-400" />
           <span className="text-sm font-medium text-slate-300">Live Preview</span>
+          {isLoading && (
+            <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin"></div>
+          )}
         </div>
         
         <div className="flex items-center space-x-2">
@@ -140,6 +203,19 @@ body {
           </Button>
         </div>
       </div>
+
+      {/* Error Display */}
+      {compilationError && (
+        <div className="p-4 border-b border-slate-700/50">
+          <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 flex items-start space-x-2">
+            <AlertCircle className="w-5 h-5 text-red-400 mt-0.5" />
+            <div className="text-red-300 text-sm">
+              <div className="font-medium mb-1">Compilation Error:</div>
+              <div className="font-mono">{compilationError}</div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Preview Content */}
       <div className="flex-1 bg-slate-900 overflow-auto p-4">
@@ -153,32 +229,12 @@ body {
           </div>
         ) : (
           <div className="flex items-start justify-center h-full">
-            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden`}>
-              <Sandpack
-                key={refreshKey}
-                template="react-ts"
-                files={sandpackFiles}
-                theme="dark"
-                options={{
-                  showConsole: false,
-                  showConsoleButton: false,
-                  showRefreshButton: false,
-                  showOpenInCodeSandbox: false,
-                  showNavigator: false,
-                  editorHeight: 0,
-                  editorWidthPercentage: 0,
-                  wrapContent: true,
-                  autorun: true,
-                  autoReload: true,
-                  bundlerURL: "https://sandpack-bundler.codesandbox.io",
-                }}
-                customSetup={{
-                  dependencies: {
-                    "react": "^18.2.0",
-                    "react-dom": "^18.2.0",
-                    "tailwindcss": "^3.3.0"
-                  }
-                }}
+            <div className={`${getViewportClass()} max-w-full border border-slate-700 rounded-lg overflow-hidden bg-white`}>
+              <iframe
+                ref={iframeRef}
+                className="w-full h-full border-0"
+                title="Live Preview"
+                sandbox="allow-scripts"
               />
             </div>
           </div>

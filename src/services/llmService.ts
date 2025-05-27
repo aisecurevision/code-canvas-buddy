@@ -23,11 +23,11 @@ class LLMService {
               content: `You are an expert React developer. Generate a complete, working React component with Tailwind CSS styling based on user requirements. 
 
 CRITICAL REQUIREMENTS:
-- Generate ONLY the React component code for App.tsx
+- Generate ONLY plain JavaScript React code (NO TypeScript annotations)
 - Use React hooks (useState, useEffect) for interactivity
 - Use Tailwind CSS for ALL styling (no custom CSS classes)
 - Make it fully functional with working buttons, forms, etc.
-- Include proper TypeScript types
+- DO NOT include TypeScript types like : string, : number, : React.FC, etc.
 - The component should be responsive and modern
 - Don't include any imports for external libraries except React hooks
 - Make it a complete, working application, not just a basic layout
@@ -40,6 +40,7 @@ CODE STRUCTURE:
 - Component name must be "App"
 - Use functional components only
 - Include real functionality, not just placeholder text
+- NO TypeScript syntax whatsoever
 
 STYLING GUIDELINES:
 - Use Tailwind's utility classes extensively
@@ -64,13 +65,13 @@ Return ONLY the component code without any explanations, markdown formatting, or
       }
 
       const data = await response.json();
-      const content = data.choices[0].message.content;
+      let content = data.choices[0].message.content;
       
       // Clean and extract React code from the response
       let extractedCode = content;
       
       // Remove markdown code blocks if present
-      const codeMatch = content.match(/```(?:tsx?|jsx?)\n?([\s\S]*?)\n?```/);
+      const codeMatch = content.match(/```(?:tsx?|jsx?|javascript)\n?([\s\S]*?)\n?```/);
       if (codeMatch) {
         extractedCode = codeMatch[1];
       }
@@ -78,13 +79,23 @@ Return ONLY the component code without any explanations, markdown formatting, or
       // Remove any leading/trailing whitespace and ensure proper formatting
       extractedCode = extractedCode.trim();
       
+      // Clean TypeScript annotations that might have slipped through
+      extractedCode = extractedCode
+        .replace(/: React\.FC[^>]*>/g, '>')
+        .replace(/: string/g, '')
+        .replace(/: number/g, '')
+        .replace(/: boolean/g, '')
+        .replace(/: any/g, '')
+        .replace(/interface\s+\w+\s*{[^}]*}/g, '')
+        .replace(/type\s+\w+\s*=[^;]*;/g, '');
+      
       // Validate that it's a proper React component
       if (!extractedCode.includes('export default') || !extractedCode.includes('const App')) {
         console.warn('Generated code might not be a valid React component');
       }
       
       return {
-        explanation: "Generated a complete React application based on your requirements.",
+        explanation: "Generated a complete React application with live preview capability.",
         code: extractedCode,
         files: []
       };
