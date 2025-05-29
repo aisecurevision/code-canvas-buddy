@@ -47,29 +47,24 @@ export const PreviewPanel = () => {
   const convertCodeToJS = (code: string): string => {
     console.log('Input code:', code);
     
-    // Clean up the code more carefully
     let cleanCode = code.trim();
     
     // Remove any markdown code blocks
     cleanCode = cleanCode.replace(/```(?:tsx?|jsx?|javascript|typescript)?\n?/g, '');
     
-    // If the code already has React import, keep it
-    if (!cleanCode.includes('import React') && !cleanCode.includes('const { useState') && cleanCode.includes('useState')) {
-      cleanCode = `import React, { useState } from 'react';\n\n${cleanCode}`;
+    // Remove any existing imports since we'll provide React globals
+    cleanCode = cleanCode.replace(/import.*from.*['"][^'"]*['"];?\n?/g, '');
+    
+    // Remove export default statements but keep the function
+    cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
+    
+    // Ensure the function is properly defined
+    if (!cleanCode.includes('function App')) {
+      // If it's a const App = () => pattern, convert to function
+      cleanCode = cleanCode.replace(/const\s+App\s*=\s*\(\s*\)\s*=>\s*{/, 'function App() {');
     }
     
-    // Handle export default properly - convert to regular function and add render call
-    if (cleanCode.includes('export default App')) {
-      // Replace export default with just the function
-      cleanCode = cleanCode.replace('export default App;', '');
-      cleanCode = cleanCode.replace(/export\s+default\s+function\s+App/g, 'function App');
-      cleanCode = cleanCode.replace(/export\s+default\s+App/g, '');
-    } else if (cleanCode.includes('export default')) {
-      // Handle other export default patterns
-      cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
-    }
-    
-    // Add rendering code at the end if not present
+    // Add rendering code at the end
     if (!cleanCode.includes('ReactDOM.createRoot') && !cleanCode.includes('ReactDOM.render')) {
       cleanCode += `\n\n// Render the component\nconst root = ReactDOM.createRoot(document.getElementById('root'));\nroot.render(React.createElement(App));`;
     }
@@ -100,22 +95,21 @@ export const PreviewPanel = () => {
       const cleanedCode = convertCodeToJS(appFile.content);
       console.log('Cleaned code:', cleanedCode);
 
-      // Compile JSX to JavaScript using Babel with proper configuration
+      // Compile JSX to JavaScript using Babel
       const compiledCode = window.Babel.transform(cleanedCode, {
-        filename: 'App.tsx',
+        filename: 'App.js',
         presets: [
           ['react', { 
             runtime: 'classic',
             pragma: 'React.createElement',
             pragmaFrag: 'React.Fragment'
           }]
-        ],
-        plugins: []
+        ]
       }).code;
 
       console.log('Compiled code:', compiledCode);
 
-      // Create the HTML template for the iframe
+      // Create the HTML template for the iframe with all React hooks available globally
       const htmlTemplate = `
 <!DOCTYPE html>
 <html lang="en">
@@ -147,6 +141,9 @@ export const PreviewPanel = () => {
 <body>
   <div id="root"></div>
   <script>
+    // Make React hooks available globally
+    const { useState, useEffect, useRef, useCallback, useMemo, useContext, useReducer } = React;
+    
     try {
       ${compiledCode}
     } catch (error) {
