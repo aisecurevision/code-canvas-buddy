@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw, AlertCircle } from 'lucide-react';
@@ -46,42 +45,36 @@ export const PreviewPanel = () => {
 
   // Convert TypeScript/JSX code to pure JavaScript
   const convertCodeToJS = (code: string): string => {
-    // Remove TypeScript type annotations and interfaces
-    let cleanCode = code
-      // Remove interface declarations
-      .replace(/interface\s+\w+\s*{[^}]*}/g, '')
-      // Remove type declarations
-      .replace(/type\s+\w+\s*=[^;]*;/g, '')
-      // Remove function parameter types
-      .replace(/:\s*React\.FC[^>]*>/g, '')
-      .replace(/:\s*string/g, '')
-      .replace(/:\s*number/g, '')
-      .replace(/:\s*boolean/g, '')
-      .replace(/:\s*any/g, '')
-      .replace(/:\s*void/g, '')
-      // Remove return type annotations
-      .replace(/\):\s*\w+\s*=>/g, ') =>')
-      .replace(/\):\s*\w+\s*{/g, ') {')
-      // Remove variable type annotations
-      .replace(/const\s+(\w+):\s*\w+\s*=/g, 'const $1 =')
-      .replace(/let\s+(\w+):\s*\w+\s*=/g, 'let $1 =')
-      // Remove import statements (they won't work in iframe)
-      .replace(/import.*from.*['"][^'"]*['"];?\n?/g, '')
-      // Remove export statements and convert to direct function
-      .replace(/export\s+default\s+/g, '')
-      .trim();
-
-    // Ensure React import exists for JSX
-    if (!cleanCode.includes('React') && cleanCode.includes('<')) {
-      cleanCode = `const { useState, useEffect } = React;\n\n${cleanCode}`;
+    console.log('Input code:', code);
+    
+    // Clean up the code more carefully
+    let cleanCode = code.trim();
+    
+    // Remove any markdown code blocks
+    cleanCode = cleanCode.replace(/```(?:tsx?|jsx?|javascript|typescript)?\n?/g, '');
+    
+    // If the code already has React import, keep it
+    if (!cleanCode.includes('import React') && !cleanCode.includes('const { useState') && cleanCode.includes('useState')) {
+      cleanCode = `import React, { useState } from 'react';\n\n${cleanCode}`;
     }
-
-    // If it's a component function, wrap it for rendering
-    if (cleanCode.includes('function App') || cleanCode.includes('const App')) {
-      // Add rendering call at the end
-      cleanCode += `\n\n// Render the component\nReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));`;
+    
+    // Handle export default properly - convert to regular function and add render call
+    if (cleanCode.includes('export default App')) {
+      // Replace export default with just the function
+      cleanCode = cleanCode.replace('export default App;', '');
+      cleanCode = cleanCode.replace(/export\s+default\s+function\s+App/g, 'function App');
+      cleanCode = cleanCode.replace(/export\s+default\s+App/g, '');
+    } else if (cleanCode.includes('export default')) {
+      // Handle other export default patterns
+      cleanCode = cleanCode.replace(/export\s+default\s+/g, '');
     }
-
+    
+    // Add rendering code at the end if not present
+    if (!cleanCode.includes('ReactDOM.createRoot') && !cleanCode.includes('ReactDOM.render')) {
+      cleanCode += `\n\n// Render the component\nconst root = ReactDOM.createRoot(document.getElementById('root'));\nroot.render(React.createElement(App));`;
+    }
+    
+    console.log('Cleaned code before Babel:', cleanCode);
     return cleanCode;
   };
 
@@ -107,10 +100,16 @@ export const PreviewPanel = () => {
       const cleanedCode = convertCodeToJS(appFile.content);
       console.log('Cleaned code:', cleanedCode);
 
-      // Compile JSX to JavaScript using Babel with TypeScript support and filename
+      // Compile JSX to JavaScript using Babel with proper configuration
       const compiledCode = window.Babel.transform(cleanedCode, {
         filename: 'App.tsx',
-        presets: ['react', 'typescript'],
+        presets: [
+          ['react', { 
+            runtime: 'classic',
+            pragma: 'React.createElement',
+            pragmaFrag: 'React.Fragment'
+          }]
+        ],
         plugins: []
       }).code;
 
