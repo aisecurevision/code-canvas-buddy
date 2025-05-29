@@ -107,8 +107,9 @@ export const PreviewPanel = () => {
       const cleanedCode = convertCodeToJS(appFile.content);
       console.log('Cleaned code:', cleanedCode);
 
-      // Compile JSX to JavaScript using Babel with TypeScript support
+      // Compile JSX to JavaScript using Babel with TypeScript support and filename
       const compiledCode = window.Babel.transform(cleanedCode, {
+        filename: 'App.tsx',
         presets: ['react', 'typescript'],
         plugins: []
       }).code;
