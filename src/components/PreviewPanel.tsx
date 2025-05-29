@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useProject } from '@/contexts/ProjectContext';
 import { Monitor, Smartphone, Tablet, RefreshCw, AlertCircle } from 'lucide-react';
@@ -141,15 +142,41 @@ export const PreviewPanel = () => {
 <body>
   <div id="root"></div>
   <script>
-    // Make React hooks available globally
-    const { useState, useEffect, useRef, useCallback, useMemo, useContext, useReducer } = React;
+    // Make ALL React hooks and utilities available globally
+    const { 
+      useState, 
+      useEffect, 
+      useRef, 
+      useCallback, 
+      useMemo, 
+      useContext, 
+      useReducer,
+      useLayoutEffect,
+      useImperativeHandle,
+      useDeferredValue,
+      useTransition,
+      useId,
+      useSyncExternalStore,
+      useInsertionEffect,
+      createContext,
+      createRef,
+      forwardRef,
+      memo,
+      lazy,
+      Suspense,
+      Fragment
+    } = React;
+    
+    // Also make them available without destructuring for older code patterns
+    window.React = React;
+    window.ReactDOM = ReactDOM;
     
     try {
       ${compiledCode}
     } catch (error) {
       console.error('Runtime error:', error);
       document.getElementById('root').innerHTML = 
-        '<div class="error">Runtime Error: ' + error.message + '\\n\\n' + error.stack + '</div>';
+        '<div class="error">Runtime Error: ' + error.message + '\\n\\nStack trace:\\n' + error.stack + '</div>';
     }
   </script>
 </body>
